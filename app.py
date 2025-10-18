@@ -23,10 +23,10 @@ def procesar_proveedor_gestion_streamlit(uploaded_file):
         return pd.DataFrame()
 
 # --- Main de la aplicación Streamlit ---
-st.title("🔍 Comparador de Precios con Variación Semanal")
+st.title("🔍 Master Price de NutriSana 🔍")
 
-# 1. Carga de Archivos (Interfaz para subir)
-st.sidebar.header("Carga de Archivos")
+# Título Secundario (st.header o st.subheader, usa subheader para que sea más pequeño)
+st.subheader("Comparador de Precios by ged")
 
 # Se usa un File Uploader para cada tipo de archivo
 minorista_file = st.sidebar.file_uploader("Subir Archivo Minorista (Nutrisana)", type=["xlsx"])
