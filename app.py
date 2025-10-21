@@ -37,7 +37,11 @@ def cargar_proveedor_desde_url(url, nombre_proveedor):
         if '% Variacion' not in df.columns:
              df['% Variacion'] = pd.NA
         else:
+             # FIX APLICADO: Elimina el símbolo '%' antes de la conversión numérica para evitar que se convierta a NaN
+             df['% Variacion'] = df['% Variacion'].astype(str).str.replace('%', '', regex=False).str.strip()
+             
              df['% Variacion'] = pd.to_numeric(df['% Variacion'], errors='coerce')
+             
              df.loc[
                  (df['% Variacion'].abs() < 1) & (df['% Variacion'] != 0.0),
                  '% Variacion'
@@ -171,7 +175,7 @@ if entrada_usuario and proveedores_cargados > 0:
                 df_filtrado = resultados[nombre_proveedor].copy()
                 st.markdown(f"\n#### --- {nombre_proveedor.upper()} ---")
 
-                # Preparar DataFrame para Streamlit Display (ORDEN DE COLUMNAS SOLICITADO)
+                # Preparar DataFrame para Streamlit Display (ORDEN DE COLUMNAS SOLICITADO: Producto, Precio, Var)
                 df_display = pd.DataFrame({
                     'Producto y Descripcion': df_filtrado['Producto y Descripcion'].str.capitalize(), # 1°
                     'Precio': df_filtrado['Precio'].apply(format_precio),                            # 2°
