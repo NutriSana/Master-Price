@@ -211,3 +211,4 @@ if entrada_usuario and proveedores_cargados > 0:
                 
                 # Mostrar el DataFrame de Streamlit
                 st.markdown(df_display.to_markdown(index=False), unsafe_allow_html=True)
+
