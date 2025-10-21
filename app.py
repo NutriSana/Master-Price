@@ -19,7 +19,8 @@ PROVEEDORES_GSPREAD = {
 }
 
 # La lista de nombres de proveedores (excepto el minorista)
-orden_proveedores = [nombre for nombre in PROVEVEDORES_GSPREAD.keys() if nombre != "NutriSana"]
+# FIX: Corregido el typo de PROVEVEDORES a PROVEEDORES_GSPREAD
+orden_proveedores = [nombre for nombre in PROVEEDORES_GSPREAD.keys() if nombre != "NutriSana"]
 minorista_nombre = "NutriSana"
 
 # --- 2. FUNCIÓN DE PROCESAMIENTO Y CARGA DESDE URL ---
@@ -190,8 +191,7 @@ if entrada_usuario and proveedores_cargados > 0:
                 })
                 
                 # Mostrar el DataFrame de Streamlit
-                # Usamos st.markdown + to_html para mantener el formato de color de la variación.
-                # Nota: st.dataframe no renderiza Markdown de forma nativa en las celdas.
+                # Nota: st.dataframe no renderiza Markdown de forma nativa en las celdas, pero to_markdown sí.
                 st.markdown(df_display.to_markdown(index=False), unsafe_allow_html=True)
-                # Opcional si prefieres la tabla nativa de Streamlit (sin colores):
+                # Si deseas usar la tabla interactiva de Streamlit (sin formato de color en las celdas):
                 # st.dataframe(df_display, use_container_width=True, hide_index=True)
