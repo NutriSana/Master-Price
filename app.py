@@ -18,40 +18,31 @@ PROVEEDORES_GSPREAD = {
     "Sta Ana": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRRfZimr5ZlRootml7K1YRC8P-UvkB4FGnHnsnOt0R_0WiVkEwsBSlh5Dk6RvVd6WVQbVz7k-cqBcwG/pub?output=csv",
 }
 
-# La lista de nombres de proveedores (excepto el minorista)
-# El nombre de la variable se corrige para que coincida con la definición de la Línea 6.
 orden_proveedores = [nombre for nombre in PROVEEDORES_GSPREAD.keys() if nombre != "NutriSana"]
 minorista_nombre = "NutriSana"
 
 # --- 2. FUNCIÓN DE PROCESAMIENTO Y CARGA DESDE URL ---
-# st.cache_data: Carga los datos automáticamente al inicio y los guarda por 1 hora (3600 segundos)
 @st.cache_data(ttl=3600)
 def cargar_proveedor_desde_url(url, nombre_proveedor):
     """Carga y procesa un archivo de proveedor desde una URL de Google Sheets (formato CSV)."""
     try:
-        # 1. Cargar el CSV directamente desde la URL
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
-            # Asegura que las cabeceras se carguen correctamente
             df = pd.read_csv(url, encoding='utf-8') 
 
-        # 2. Asegurarse de que las columnas críticas existen
         if 'Producto y Descripcion' not in df.columns or 'Precio' not in df.columns:
              st.warning(f"⚠️ Error en {nombre_proveedor}: Columnas 'Producto y Descripcion' o 'Precio' no encontradas. Revise el encabezado de su hoja.")
              return pd.DataFrame()
 
-        # 3. Procesamiento del % Variacion 
         if '% Variacion' not in df.columns:
              df['% Variacion'] = pd.NA
         else:
              df['% Variacion'] = pd.to_numeric(df['% Variacion'], errors='coerce')
-             # Normaliza los valores que son 0.0x para que sean porcentajes (ej. 0.05 -> 5.0)
              df.loc[
                  (df['% Variacion'].abs() < 1) & (df['% Variacion'] != 0.0),
                  '% Variacion'
              ] = df['% Variacion'] * 100
 
-        # 4. Limpieza básica de la columna de descripción (a minúsculas y elimina saltos de línea)
         df['Producto y Descripcion'] = df['Producto y Descripcion'].astype(str).str.lower().apply(
              lambda x: re.sub(r'[\r\n]+', ' ', x).strip()
         )
@@ -72,18 +63,14 @@ def buscar_y_comparar_precios_web(minorista_df, minorista_nombre, mayoristas_dat
     if not palabras_incluir:
         return {}
 
-    # Lógica de búsqueda OR o AND
     palabras_or = []
-    # Verifica si el usuario usó el separador OR (|)
     if any('|' in p for p in palabras_incluir):
         palabras_or = [p.strip() for p in ' '.join(palabras_incluir).split('|') if p.strip()]
         
         def filtro_productos(descripcion):
-             # Filtro: Contiene AL MENOS una palabra OR y NO contiene ninguna de las excluidas
              return any(p in descripcion for p in palabras_or) and not any(p in descripcion for p in palabras_excluir)
     else:
         def filtro_productos(descripcion):
-             # Filtro: Contiene TODAS las palabras INCLUIDAS y NO contiene ninguna de las excluidas
              return all(p in descripcion for p in palabras_incluir) and not any(p in descripcion for p in palabras_excluir)
 
     resultados = {}
@@ -114,21 +101,24 @@ def buscar_y_comparar_precios_web(minorista_df, minorista_nombre, mayoristas_dat
 # --- 4. FUNCIONES DE FORMATO PARA LA VISUALIZACIÓN EN STREAMLIT ---
 
 def format_variacion(v):
-    """Formatea la variación con color y símbolo usando Markdown de Streamlit."""
+    """
+    Formatea la variación con color y símbolo.
+    Lógica Comercial: Precio más bajo (Negativo) -> ROJO (Alerta de Oportunidad).
+    Precio más alto (Positivo) -> Verde (Alerta de Advertencia).
+    """
     if pd.notna(v) and v != 0.0:
         variacion_str = f"{abs(v):.1f}%".replace('.', ',')
-        if v > 0:
-            # Color Rojo (Advertencia/Precio subió)
-            return f':red[▲ +{variacion_str}]' 
+        if v < 0:
+            # Color Rojo: Precio bajó (Oportunidad, Resaltar)
+            return f':red[▼ {variacion_str}]' 
         else:
-            # Color Verde (Oportunidad/Precio bajó)
-            return f':green[▼ -{variacion_str}]'
+            # Color Verde: Precio subió (Advertencia/Cuidado)
+            return f':green[▲ +{variacion_str}]'
     return ''
 
 def format_precio(p):
     """Formatea el precio como moneda con separador de miles (ej: $1.234)."""
     try:
-        # Limpieza robusta de la entrada y formateo
         p_str = str(p).replace('.', '').replace(',', '.')
         precio_int = int(float(p_str))
         return f"${precio_int:,}".replace(',', '.')
@@ -138,7 +128,6 @@ def format_precio(p):
 # --- INTERFAZ STREAMLIT (MAIN) ---
 st.title("Master Price de NutriSana")
 st.subheader("Comparador de Precios")
-
 
 # 1. Carga de Datos al inicio (Automática)
 st.sidebar.header("Estado de los Datos")
@@ -182,12 +171,11 @@ if entrada_usuario and proveedores_cargados > 0:
                 df_filtrado = resultados[nombre_proveedor].copy()
                 st.markdown(f"\n#### --- {nombre_proveedor.upper()} ---")
 
-                # Preparar DataFrame para Streamlit Display
+                # Preparar DataFrame para Streamlit Display (ORDEN DE COLUMNAS SOLICITADO)
                 df_display = pd.DataFrame({
-                    'Precio': df_filtrado['Precio'].apply(format_precio),
-                    'Var. Sem.': df_filtrado['% Variacion'].apply(format_variacion),
-                    # Usamos .str.capitalize() para mejorar la lectura de la descripción en la tabla
-                    'Producto y Descripcion': df_filtrado['Producto y Descripcion'].str.capitalize(), 
+                    'Producto y Descripcion': df_filtrado['Producto y Descripcion'].str.capitalize(), # 1°
+                    'Precio': df_filtrado['Precio'].apply(format_precio),                            # 2°
+                    'Var. Sem.': df_filtrado['% Variacion'].apply(format_variacion),                 # 3°
                 })
                 
                 # Mostrar el DataFrame de Streamlit
