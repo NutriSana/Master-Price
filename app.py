@@ -215,3 +215,4 @@ if entrada_usuario and proveedores_cargados > 0:
                 st.markdown(df_display.to_markdown(index=False), unsafe_allow_html=True)
 
 
+
