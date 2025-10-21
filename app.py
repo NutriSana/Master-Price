@@ -19,7 +19,7 @@ PROVEEDORES_GSPREAD = {
 }
 
 # La lista de nombres de proveedores (excepto el minorista)
-# FIX: Corregido el typo de PROVEVEDORES a PROVEEDORES_GSPREAD
+# El nombre de la variable se corrige para que coincida con la definición de la Línea 6.
 orden_proveedores = [nombre for nombre in PROVEEDORES_GSPREAD.keys() if nombre != "NutriSana"]
 minorista_nombre = "NutriSana"
 
@@ -191,7 +191,4 @@ if entrada_usuario and proveedores_cargados > 0:
                 })
                 
                 # Mostrar el DataFrame de Streamlit
-                # Nota: st.dataframe no renderiza Markdown de forma nativa en las celdas, pero to_markdown sí.
                 st.markdown(df_display.to_markdown(index=False), unsafe_allow_html=True)
-                # Si deseas usar la tabla interactiva de Streamlit (sin formato de color en las celdas):
-                # st.dataframe(df_display, use_container_width=True, hide_index=True)
