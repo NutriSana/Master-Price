@@ -2,20 +2,21 @@ import pandas as pd
 import streamlit as st
 import warnings
 import re
-import unicodedata # <--- NUEVA LIBRERÍA
+import unicodedata 
 
 # --- 1. DEFINICIÓN DE FUENTES DE DATOS PERMANENTES (PEGADAS DEL ARCHIVO PLANO) ---
-# La aplicación leerá los datos directamente de estas URLs CSV publicadas en Google Sheets.
+# FIX aplicado a Adicon: Cambiado '/sheets/' por '/spreadsheets/' 
+# Si NutriSana falla, la URL debe ser re-publicada y pegada aquí.
 PROVEEDORES_GSPREAD = {
-    "NutriSana": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQQalLyAjQf428gCk1370q_gFDbdvHxISf7ZJ445PGNcDqWJc1NYZDnCw5uPK7gOti1DEW/pub?output=csv",
+    "NutriSana": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQQalLyAjQf428gCk1370q_gFDbdvHxISf7ZJ445PGNcDqWJc1NYZDnCw5uPK7gOcp7FsyHgOti1DEW/pub?output=csv",
     "Distrimay": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCyAsWTWw1Yr7rlYXPUf6J84bxskPI4HQeeofaD5ayRWr--PHuEQ88XvtVwNn-tfNjODzQfBNOMx8P/pub?output=csv",
     "ByC": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRPanQSsCEcNUhDHWnEi8T6gNpXS0Gt2UPc9-UxZ4VUVXtwRH-57Y3-UIFBPz5v0zp3EClpiFWIBcNY/pub?output=csv",
     "Salteño": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIbSgI_6QffZvWzxiYxq9lZifQcxQNjAvqmocdX3teIhzfMH5JIO3QfgPpfqYREAxP4nZGeZjlMKN8/pub?output=csv",
     "Activate": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQYc-1NKWS-BPVgGmAAYWNGvBZbX4Ct39DKdCdrbKDDuy9g-qgpntMn38jEDn6D_Y7Fury5pgFEklLo/pub?output=csv",
     "Mercadito": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRB4oq8P5PMVmQfozZhhwEZpp5gvhPbX0d4VKaUXkFtdU__9Cgb_CYEg_Y5_T7AOCLPwnxDlqsjIKy2/pub?output=csv",
-    "Adicon": "https://docs.google.com/sheets/d/e/2PACX-1vQa-lp-5_43z1AD_yxcTiHg67XfF8bia-rmwzh-IJMMJEQfDFHI9ubIbXP3sPGr9kj1nkuQtwN3EmMy/pub?output=csv",
+    "Adicon": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQa-lp-5_43z1AD_yxcTiHg67XfF8bia-rmwzh-IJMMJEQfDFHI9ubIbXP3sPGr9kj1nkuQtwN3EmMy/pub?output=csv",
     "Adrian": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCK0Q1WP5bQ0P9_Xazw3TYYpgs0LOLT2A7ZDeMGrV8aZ0bUJQkjBT9hYQu8UryQcJN6SgBFQgxyPuR/pub?output=csv",
-    "Naturista": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSSnB4VhOGvIBgNusRrQRlvorvJ0YkBtnkj5rrRhyDfERIzSD8Ewx8K96PgMlOjDqXzGd4ZqL3bvu7s/pub?output=csv",
+    "Naturista": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSSnB4VhOGvIBgNusRrQRlvorvJ0YkBtnkj5rrRhyDfERIzSD8Ewx8K99PgMlOjDqXzGd4ZqL3bvu7s/pub?output=csv",
     "Sta Ana": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRRfZimr5ZlRootml7K1YRC8P-UvkB4FGnHnsnOt0R_0WiVkEwsBSlh5Dk6RvVd6WVQbVz7k-cqBcwG/pub?output=csv",
 }
 
@@ -59,7 +60,9 @@ def cargar_proveedor_desde_url(url, nombre_proveedor):
         if '% Variacion' not in df.columns:
              df['% Variacion'] = pd.NA
         else:
+             # Elimina el símbolo '%' antes de la conversión numérica
              df['% Variacion'] = df['% Variacion'].astype(str).str.replace('%', '', regex=False).str.strip()
+             
              df['% Variacion'] = pd.to_numeric(df['% Variacion'], errors='coerce')
              
              # Conversión si el porcentaje está en formato 0.05
@@ -71,6 +74,7 @@ def cargar_proveedor_desde_url(url, nombre_proveedor):
         return df
 
     except Exception as e:
+        # Muestra el error específico para ayudar al usuario a diagnosticar URL
         st.error(f"❌ Error al cargar los datos de {nombre_proveedor}. Revise la URL o el formato de la hoja: {e}")
         return pd.DataFrame()
 
