@@ -3,7 +3,9 @@ import streamlit as st
 import warnings
 import re
 import unicodedata
-from typing import Dict, Any
+# --- CORRECCIÓN ---
+# Añadir 'List' a la importación de typing
+from typing import Dict, Any, List 
 
 # --- DEFINICIÓN DE FUENTES DE DATOS PERMANENTES (11 Proveedores) ---
 # Se utiliza el nombre del proveedor como clave. 
@@ -131,12 +133,7 @@ def format_variacion(v: Any) -> str:
     variacion = float(v)
     variacion_str = f"{abs(variacion):.1f}%".replace('.', ',')
     
-    # Lógica: Precio más bajo (negativo) -> OPORTUNIDAD (Rojo)
-    # Precio más alto (positivo) -> ALERTA (Verde)
-    # NOTA: En el mercado de precios, a menudo se usa rojo para la oportunidad/riesgo,
-    # y verde para el aumento. Usamos el rojo (alerta) para el aumento (+) y verde para la baja (-).
-    # Sin embargo, si el usuario desea que la baja sea ROJO (para destacar la oportunidad), invertimos:
-    
+    # Lógica: Baja el precio (negativo) -> OPORTUNIDAD (Rojo)
     if variacion > 0: # Sube el precio
         color = "green"
         simbolo = "▲"
@@ -162,24 +159,35 @@ def format_precio(p: Any, nombre_proveedor: str) -> str:
         # --- LÓGICA CONDICIONAL ---
         if nombre_proveedor == "Granja":
             # Granja ya viene como número entero (11285), sin decimales, 
-            # ya que el script de extracción redondeó. No hacer divisiones.
-            return f"${int(precio_num):,}".replace(',', '.')
-        else:
-            # Mantener la lógica original para las otras tiendas que funcionan bien.
-            # Se asume que el precio ya está formateado correctamente o contiene decimales.
-            # Usamos el separador de miles '.' y la coma ',' como separador decimal.
+            # ya que el script de extracción redondeó. Usar el punto como separador de miles.
             
-            # Formatear el precio usando la coma para decimales (convención argentina)
-            # Primero formateamos con el punto para miles (por defecto en Python/Pandas)
-            formato_standar = f"{precio_num:,.0f}" if precio_num % 1 == 0 else f"{precio_num:,.2f}"
+            # Formatear el número entero como string con separadores de miles
+            formato_miles = f"{int(precio_num):,}".replace(',', '#') # Usar # temporalmente
+            formato_final = formato_miles.replace('.', ',').replace('#', '.') # Convertir Python's , a . para miles
+            
+            # Ajustamos para el caso de números pequeños (sin separador de miles)
+            if not '.' in formato_final: 
+                formato_final = formato_final.replace(',', '.')
+
+            return f"${formato_final}"
+        else:
+            # Lógica original para las otras tiendas (asume precio_num ya incluye decimales si los tenía)
+            # Usamos el separador de miles '.' y la coma ',' como separador decimal (Convención Arg)
+            
+            # Formatear con el punto para miles y la coma para decimales.
+            # Primero formateamos con el formato standard (e.g., 1,234.56)
+            # Determinar si hay decimales significativos para no truncar a .00
+            if abs(precio_num) % 1 == 0:
+                formato_standar = f"{precio_num:,.0f}" 
+            else:
+                formato_standar = f"{precio_num:,.2f}"
             
             # Reemplazamos la convención: 1,234.56 -> 1.234,56
-            if '.' in formato_standar:
-                # 1.234,56
-                formato_arg = formato_standar.replace('.', '#').replace(',', '.').replace('#', ',')
-            else:
-                 formato_arg = formato_standar.replace(',', '.')
-
+            if '.' in formato_standar: # Si tiene decimales (e.g., 1,234.56)
+                formato_arg = formato_standar.replace('.', '#').replace(',', '.').replace('#', ',') # 1.234,56
+            else: # Si es entero (e.g., 1,234)
+                 formato_arg = formato_standar.replace(',', '.') # 1.234
+                 
             return f"${formato_arg}"
             
     except (ValueError, TypeError):
