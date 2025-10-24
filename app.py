@@ -18,7 +18,7 @@ PROVEEDORES_GSPREAD = {
     "Adrian": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCK0Q1WP5bQ0P9_Xazw3TYYpgs0LOLT2A7ZDeMGrV8aZ0bUJQkjBT9hYQu8UryQcJN6SgBFQgxyPuR/pub?output=csv",
     "Naturista": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSSnB4VhOGvIBgNusRrQRlvorvJ0YkBtnkj5rrRhyDfERIzSD8Ewx8K96PgMlOjDqXzGd4ZqL3bvu7s/pub?output=csv",
     "Sta Ana": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRRfZimr5ZlRootml7K1YRC8P-UvkB4FGnHnsnOt0R_0WiVkEwsBSlh5Dk6RvVd6WVQbVz7k-cqBcwG/pub?output=csv",
-    "Granja": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSNLPa4CWzGrjoL2XEzoBYrkepJSJ7RzOzb5XqP2hXyg1RPodDUTHbdkfPQphGZ5K1XmRo1WQK0br4S/pub?output=csv",
+    "Granja": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSNLPa4CWzGrjoL2XEzoBYrkepJSJ7RzOzb5XqP2hXyg1RPoddUTHbdkfPQphGZ5K1XmRo1WQK0br4S/pub?output=csv",
 }
 
 # Generar la lista de proveedores (excluyendo NutriSana para el orden de la tabla)
@@ -153,7 +153,6 @@ def format_precio(p: float, nombre_proveedor: str) -> str:
         # LÓGICA PARA LOS OTROS PROVEEDORES: Asumir que el formato original funcionaba.
         # Asumimos que el valor en Sheets viene en formato de miles con punto decimal.
         # Aplicamos formato estándar y luego invertimos el punto y la coma para display argentino.
-        # Esto es un placeholder para la lógica que YA TE FUNCIONABA.
         return f"${p:,.2f}".replace(",", "_TEMP_").replace(".", ",").replace("_TEMP_", ".")
         
     except (ValueError, TypeError):
@@ -178,7 +177,7 @@ def format_variacion(v: float) -> str:
 
 # --- INTERFAZ STREAMLIT (MAIN) ---
 
-# Título Principal (st.markdown para permitir estilos HTML)
+# Título Principal (st.markdown para permitir estilos HTML y solucionar TypeError)
 st.markdown("<h1>Master Price de NutriSana <span style='font-size: 50%; color: #888;'>by GED</span></h1>", unsafe_allow_html=True)
 st.subheader("Comparador de Precios")
 
@@ -239,5 +238,5 @@ if entrada_usuario and proveedores_cargados > 0:
                     'Var. Sem.': df_filtrado['% Variacion'].apply(format_variacion),
                 })
                 
-                # Usamos st.write con to_html para renderizar los colores de la Var. Sem.
+                # Usamos st.write con to_html para renderizar los colores de la Var. Sem. y ELIMINAR EL ÍNDICE (index=False)
                 st.write(df_display.style.to_html(index=False, escape=False), unsafe_allow_html=True)
