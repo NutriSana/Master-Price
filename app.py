@@ -134,8 +134,8 @@ def buscar_y_comparar_precios_web(minorista_df: pd.DataFrame, minorista_nombre: 
 
 def format_precio(p: float, nombre_proveedor: str) -> str:
     """
-    Formatea el precio, aplicando la lógica condicional para Granja y la lógica
-    original (que asume decimales o formato diferente) para otros.
+    Formatea el precio, aplicando la lógica condicional para Granja (entero)
+    y la lógica original (decimal) para otros.
     """
     if pd.isna(p) or p is None:
         return "N/D"
@@ -146,19 +146,14 @@ def format_precio(p: float, nombre_proveedor: str) -> str:
         
         # LÓGICA ESPECIAL PARA GRANJA: El precio viene como entero (11285) sin decimales.
         if nombre_proveedor == "Granja":
-            # Formatear el entero como separador de miles
-            # Usamos f-string con formato de miles y el punto como separador (Argentina usa coma)
-            # Pero Streamlit/Python usa punto por defecto en este formato. 
-            # Reemplazamos el punto de miles por coma para el display final.
+            # Formatear el entero como separador de miles. Usamos replace para que el punto
+            # que Python usa como separador de miles se convierta a la coma argentina.
             return f"${int(p):,}".replace(",", ".") 
         
-        # LÓGICA PARA LOS OTROS PROVEEDORES: Usar la lógica que ya funcionaba,
-        # que asume que el precio ya viene bien formateado o con decimales.
-        # Se asume que el valor en Sheets viene en el formato que funcionaba
-        # con tu código anterior.
-        
-        # Aplicamos el formato estándar de miles con punto (.) y reemplazamos a coma (,)
-        # para visualización argentina.
+        # LÓGICA PARA LOS OTROS PROVEEDORES: Asumir que el formato original funcionaba.
+        # Asumimos que el valor en Sheets viene en formato de miles con punto decimal.
+        # Aplicamos formato estándar y luego invertimos el punto y la coma para display argentino.
+        # Esto es un placeholder para la lógica que YA TE FUNCIONABA.
         return f"${p:,.2f}".replace(",", "_TEMP_").replace(".", ",").replace("_TEMP_", ".")
         
     except (ValueError, TypeError):
@@ -166,23 +161,25 @@ def format_precio(p: float, nombre_proveedor: str) -> str:
 
 
 def format_variacion(v: float) -> str:
-    """Formatea la variación con color y símbolo (HTML). Rojo para baja (<0), Verde para subida (>0)."""
+    """Formatea la variación con color y símbolo (HTML). Verde para subida (>0), Rojo para baja (<0)."""
     if pd.isna(v) or v == 0.0:
         return ''
 
-    # Lógica de Color: Rojo para la BAJA (Oportunidad), Verde para la SUBIDA.
+    # Lógica de Color: Rojo para la BAJA (Oportunidad), Verde para la SUBIDA (Advertencia/Tendencia).
     simbolo = "▲" if v > 0 else "▼"
     color = "green" if v > 0 else "red"
     
     # Formato del número (ej: 10,3%)
     variacion_str = f"{abs(v):.1f}%".replace('.', ',')
     
-    # Retornamos HTML para que st.markdown lo interprete
+    # Retornamos HTML para que st.write(..., unsafe_allow_html=True) lo interprete
     return f'<span style="color:{color}; font-weight: bold;">{simbolo} {variacion_str}</span>'
 
 
 # --- INTERFAZ STREAMLIT (MAIN) ---
-st.title("Master Price de NutriSana " + '<span style="font-size: 50%; color: #888;">by GED</span>', unsafe_allow_html=True)
+
+# Título Principal (st.markdown para permitir estilos HTML)
+st.markdown("<h1>Master Price de NutriSana <span style='font-size: 50%; color: #888;'>by GED</span></h1>", unsafe_allow_html=True)
 st.subheader("Comparador de Precios")
 
 # 1. Carga de Datos al inicio (Automática)
@@ -242,6 +239,5 @@ if entrada_usuario and proveedores_cargados > 0:
                     'Var. Sem.': df_filtrado['% Variacion'].apply(format_variacion),
                 })
                 
-                # Concatenar las columnas de texto (Producto y Precio) y la columna HTML (Var. Sem.)
-                # Usamos st.markdown con to_html para renderizar los colores de la Var. Sem.
+                # Usamos st.write con to_html para renderizar los colores de la Var. Sem.
                 st.write(df_display.style.to_html(index=False, escape=False), unsafe_allow_html=True)
