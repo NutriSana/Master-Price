@@ -3,12 +3,10 @@ import streamlit as st
 import warnings
 import re
 import unicodedata
-# --- CORRECCIÓN ---
-# Añadir 'List' a la importación de typing
-from typing import Dict, Any, List 
+from typing import List, Dict
 
-# --- DEFINICIÓN DE FUENTES DE DATOS PERMANENTES (11 Proveedores) ---
-# Se utiliza el nombre del proveedor como clave. 
+# --- DEFINICIÓN DE FUENTES DE DATOS PERMANENTES (11 PROVEEDORES) ---
+# Se utiliza el parámetro 'output=csv' para que Pandas lo lea directamente
 PROVEEDORES_GSPREAD = {
     "NutriSana": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQQalLyAjQf428gCk1370q_gFDbdvHxISf7ZJ445PGNcDqWJc1NYZDnCw5uPK7gOcp7FsyHgOti1DEW/pub?output=csv",
     "Distrimay": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCyAsWTWw1Yr7rlYXPUf6J84bxskPI4HQeeofaD5ayRWr--PHuEQ88XvtVwNn-tfNjODzQfBNOMx8P/pub?output=csv",
@@ -23,70 +21,71 @@ PROVEEDORES_GSPREAD = {
     "Granja": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSNLPa4CWzGrjoL2XEzoBYrkepJSJ7RzOzb5XqP2hXyg1RPodDUTHbdkfPQphGZ5K1XmRo1WQK0br4S/pub?output=csv",
 }
 
-# La lista de nombres de proveedores se genera automáticamente desde el diccionario
+# Generar la lista de proveedores (excluyendo NutriSana para el orden de la tabla)
 orden_proveedores = [nombre for nombre in PROVEEDORES_GSPREAD.keys() if nombre != "NutriSana"]
 
 
-# --- FUNCIONES DE LIMPIEZA Y PROCESAMIENTO ---
-
+# --- FUNCIÓN DE LIMPIEZA Y NORMALIZACIÓN DE ACENTOS ---
 def normalizar_busqueda(texto: str) -> str:
-    """Elimina acentos, convierte a minúsculas y limpia el texto para la búsqueda."""
-    if not isinstance(texto, str):
+    """Elimina acentos, convierte a minúsculas y normaliza el texto para la búsqueda."""
+    if pd.isna(texto):
         return ""
-    # 1. Normalizar Unicode para separar acentos y diéresis de la letra base
-    normalized = unicodedata.normalize('NFD', texto.lower())
-    # 2. Eliminar caracteres diacríticos (acentos, virgulillas)
-    # Criterio: mantén solo el carácter si no es un Mark (Mn)
-    no_accents = ''.join(char for char in normalized if unicodedata.category(char) != 'Mn')
-    # 3. Limpiar caracteres especiales y dejar solo letras, números y espacios
-    return re.sub(r'[^a-z0-9\s]', '', no_accents).strip()
+    try:
+        # Convertir a minúsculas
+        texto = str(texto).lower()
+        # Eliminar acentos y caracteres especiales (normalización Unicode)
+        nfkd_form = unicodedata.normalize('NFKD', texto)
+        return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+    except Exception:
+        return ""
 
 
+# --- FUNCIÓN DE PROCESAMIENTO Y CARGA DESDE URL ---
 @st.cache_data(ttl=3600)
 def cargar_proveedor_desde_url(url: str, nombre_proveedor: str) -> pd.DataFrame:
-    """Carga y procesa un archivo de proveedor desde una URL de Google Sheets (formato CSV)."""
+    """Carga y procesa un archivo de proveedor desde una URL de Google Sheets."""
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
-            # Leer el archivo CSV directamente desde la URL
+            # Leer el CSV directamente desde la URL
             df = pd.read_csv(url)
 
-        # Verificar encabezados
+        # A: VERIFICACIÓN DE COLUMNAS (Obligatorio para Streamlit)
         required_cols = ['Producto y Descripcion', 'Precio']
         if not all(col in df.columns for col in required_cols):
-             st.warning(f"⚠️ Error en {nombre_proveedor}: Columnas {required_cols} no encontradas. Revise el encabezado de su hoja.")
+             st.warning(f"⚠️ Error en {nombre_proveedor}: Columnas 'Producto y Descripcion' o 'Precio' no encontradas. Revise el encabezado de su hoja.")
              return pd.DataFrame()
 
-        # 1. Procesamiento de la Variación (% Variacion)
-        if '% Variacion' not in df.columns:
-             df['% Variacion'] = 0.0 # Inicializar si no existe
-        else:
-             # Limpiar el símbolo % para permitir conversión numérica
-             df['% Variacion'] = df['% Variacion'].astype(str).str.replace('%', '', regex=False)
-             df['% Variacion'] = pd.to_numeric(df['% Variacion'], errors='coerce')
-             
-             # Conversión de decimales a porcentaje base 100
-             df.loc[
-                 (df['% Variacion'] < 1) & (df['% Variacion'] > -1) & (df['% Variacion'] != 0.0),
-                 '% Variacion'
-             ] = df['% Variacion'] * 100
+        # B: LIMPIEZA Y PROCESAMIENTO DEL % VARIACION
+        if '% Variacion' in df.columns:
+            # 1. Eliminar el símbolo % si está presente
+            df['% Variacion'] = df['% Variacion'].astype(str).str.replace('%', '', regex=False)
+            df['% Variacion'] = pd.to_numeric(df['% Variacion'], errors='coerce')
+            
+            # 2. Ajustar porcentajes si el formato original era decimal (ej. 0.05 -> 5.0)
+            df.loc[
+                (df['% Variacion'].abs() < 1) & (df['% Variacion'].abs() > 0.001),
+                '% Variacion'
+            ] = df['% Variacion'] * 100
 
-        # 2. Limpieza y normalización de la descripción (Crucial para la búsqueda con/sin acento)
-        df['Producto y Descripcion Original'] = df['Producto y Descripcion'].astype(str)
-        df['Producto y Descripcion'] = df['Producto y Descripcion Original'].apply(normalizar_busqueda)
+        # C: NORMALIZACIÓN DE LA COLUMNA DE BÚSQUEDA
+        df['Producto y Descripcion Normalizada'] = df['Producto y Descripcion'].apply(normalizar_busqueda)
         
         return df
 
     except Exception as e:
+        # Aquí capturamos el error 404 (URL rota o no pública)
         st.error(f"❌ Error al cargar los datos de {nombre_proveedor}. Revise la URL o el formato de la hoja: {e}")
         return pd.DataFrame()
 
 
+# --- FUNCIÓN DE BÚSQUEDA ---
 def buscar_y_comparar_precios_web(minorista_df: pd.DataFrame, minorista_nombre: str, mayoristas_dataframes_dict: Dict[str, pd.DataFrame], orden_proveedores: List[str], entrada_usuario: str) -> Dict[str, pd.DataFrame]:
-    """Realiza la búsqueda en los DataFrames cargados utilizando la normalización."""
+    """Realiza la búsqueda y prepara los resultados para su visualización en Streamlit."""
     
-    # Normalizar la entrada del usuario para la búsqueda
+    # Normalizar la entrada del usuario para buscar sin acentos
     entrada_normalizada = normalizar_busqueda(entrada_usuario)
+    
     palabras_incluir = [p for p in entrada_normalizada.split() if not p.startswith('-')]
     palabras_excluir = [p.lstrip('-') for p in entrada_normalizada.split() if p.startswith('-')]
     
@@ -97,24 +96,32 @@ def buscar_y_comparar_precios_web(minorista_df: pd.DataFrame, minorista_nombre: 
     palabras_or = []
     if any('|' in p for p in palabras_incluir):
         palabras_or = [p.strip() for p in ' '.join(palabras_incluir).split('|') if p.strip()]
-        def filtro_productos(descripcion_normalizada):
-             return any(p in descripcion_normalizada for p in palabras_or) and not any(p in descripcion_normalizada for p in palabras_excluir)
+        
+        def filtro_productos(descripcion):
+             # La descripción a buscar ya está normalizada en 'Producto y Descripcion Normalizada'
+             return any(p in descripcion for p in palabras_or) and not any(p in descripcion for p in palabras_excluir)
     else:
-        def filtro_productos(descripcion_normalizada):
-             return all(p in descripcion_normalizada for p in palabras_incluir) and not any(p in descripcion_normalizada for p in palabras_excluir)
+        def filtro_productos(descripcion):
+             return all(p in descripcion for p in palabras_incluir) and not any(p in descripcion for p in palabras_excluir)
 
     resultados = {}
     
-    # Iterar sobre todos los proveedores (minorista + mayoristas)
-    todos_proveedores = {minorista_nombre: minorista_df, **mayoristas_dataframes_dict}
-    
-    for nombre_proveedor, df_proveedor in todos_proveedores.items():
-        if df_proveedor is None or df_proveedor.empty:
+    # Búsqueda en el archivo minorista
+    if not minorista_df.empty:
+        minorista_filtrado = minorista_df[
+            minorista_df['Producto y Descripcion Normalizada'].apply(filtro_productos)
+        ].copy()
+        if not minorista_filtrado.empty:
+            resultados[minorista_nombre] = minorista_filtrado
+
+    # Búsqueda en los archivos de los mayoristas
+    for nombre_proveedor in orden_proveedores:
+        df_mayorista = mayoristas_dataframes_dict.get(nombre_proveedor)
+        if df_mayorista is None or df_mayorista.empty:
             continue
             
-        df_filtrado = df_proveedor[
-            # Aplicar filtro sobre la columna normalizada 'Producto y Descripcion'
-            df_proveedor['Producto y Descripcion'].apply(filtro_productos)
+        df_filtrado = df_mayorista[
+            df_mayorista['Producto y Descripcion Normalizada'].apply(filtro_productos)
         ].copy()
             
         if not df_filtrado.empty:
@@ -123,80 +130,59 @@ def buscar_y_comparar_precios_web(minorista_df: pd.DataFrame, minorista_nombre: 
     return resultados
 
 
-# --- FUNCIONES DE VISUALIZACIÓN ---
+# --- FUNCIÓN DE FORMATO DE COLUMNAS PARA DISPLAY ---
 
-def format_variacion(v: Any) -> str:
-    """Formatea el porcentaje de variación con símbolos y color."""
-    if pd.isna(v) or v == 0.0:
-        return ''
-    
-    variacion = float(v)
-    variacion_str = f"{abs(variacion):.1f}%".replace('.', ',')
-    
-    # Lógica: Baja el precio (negativo) -> OPORTUNIDAD (Rojo)
-    if variacion > 0: # Sube el precio
-        color = "green"
-        simbolo = "▲"
-    else: # Baja el precio o es la oportunidad
-        color = "red"
-        simbolo = "▼"
-        
-    return f':{color}[{simbolo} {variacion_str}]'
+def format_precio(p: float, nombre_proveedor: str) -> str:
+    """
+    Formatea el precio, aplicando la lógica condicional para Granja y la lógica
+    original (que asume decimales o formato diferente) para otros.
+    """
+    if pd.isna(p) or p is None:
+        return "N/D"
 
-def format_precio(p: Any, nombre_proveedor: str) -> str:
-    """
-    Formatea el precio, aplicando una lógica especial para Granja (que viene sin decimales).
-    """
     try:
-        # Intenta limpiar el precio primero
-        p_str = str(p).replace(',', '').replace('$', '').strip()
+        # Convertir a número float si es necesario
+        p = float(p)
         
-        if not p_str:
-            return "N/D"
-
-        precio_num = float(p_str)
-        
-        # --- LÓGICA CONDICIONAL ---
+        # LÓGICA ESPECIAL PARA GRANJA: El precio viene como entero (11285) sin decimales.
         if nombre_proveedor == "Granja":
-            # Granja ya viene como número entero (11285), sin decimales, 
-            # ya que el script de extracción redondeó. Usar el punto como separador de miles.
-            
-            # Formatear el número entero como string con separadores de miles
-            formato_miles = f"{int(precio_num):,}".replace(',', '#') # Usar # temporalmente
-            formato_final = formato_miles.replace('.', ',').replace('#', '.') # Convertir Python's , a . para miles
-            
-            # Ajustamos para el caso de números pequeños (sin separador de miles)
-            if not '.' in formato_final: 
-                formato_final = formato_final.replace(',', '.')
-
-            return f"${formato_final}"
-        else:
-            # Lógica original para las otras tiendas (asume precio_num ya incluye decimales si los tenía)
-            # Usamos el separador de miles '.' y la coma ',' como separador decimal (Convención Arg)
-            
-            # Formatear con el punto para miles y la coma para decimales.
-            # Primero formateamos con el formato standard (e.g., 1,234.56)
-            # Determinar si hay decimales significativos para no truncar a .00
-            if abs(precio_num) % 1 == 0:
-                formato_standar = f"{precio_num:,.0f}" 
-            else:
-                formato_standar = f"{precio_num:,.2f}"
-            
-            # Reemplazamos la convención: 1,234.56 -> 1.234,56
-            if '.' in formato_standar: # Si tiene decimales (e.g., 1,234.56)
-                formato_arg = formato_standar.replace('.', '#').replace(',', '.').replace('#', ',') # 1.234,56
-            else: # Si es entero (e.g., 1,234)
-                 formato_arg = formato_standar.replace(',', '.') # 1.234
-                 
-            return f"${formato_arg}"
-            
+            # Formatear el entero como separador de miles
+            # Usamos f-string con formato de miles y el punto como separador (Argentina usa coma)
+            # Pero Streamlit/Python usa punto por defecto en este formato. 
+            # Reemplazamos el punto de miles por coma para el display final.
+            return f"${int(p):,}".replace(",", ".") 
+        
+        # LÓGICA PARA LOS OTROS PROVEEDORES: Usar la lógica que ya funcionaba,
+        # que asume que el precio ya viene bien formateado o con decimales.
+        # Se asume que el valor en Sheets viene en el formato que funcionaba
+        # con tu código anterior.
+        
+        # Aplicamos el formato estándar de miles con punto (.) y reemplazamos a coma (,)
+        # para visualización argentina.
+        return f"${p:,.2f}".replace(",", "_TEMP_").replace(".", ",").replace("_TEMP_", ".")
+        
     except (ValueError, TypeError):
         return "N/D"
 
 
+def format_variacion(v: float) -> str:
+    """Formatea la variación con color y símbolo (HTML). Rojo para baja (<0), Verde para subida (>0)."""
+    if pd.isna(v) or v == 0.0:
+        return ''
+
+    # Lógica de Color: Rojo para la BAJA (Oportunidad), Verde para la SUBIDA.
+    simbolo = "▲" if v > 0 else "▼"
+    color = "green" if v > 0 else "red"
+    
+    # Formato del número (ej: 10,3%)
+    variacion_str = f"{abs(v):.1f}%".replace('.', ',')
+    
+    # Retornamos HTML para que st.markdown lo interprete
+    return f'<span style="color:{color}; font-weight: bold;">{simbolo} {variacion_str}</span>'
+
+
 # --- INTERFAZ STREAMLIT (MAIN) ---
-st.title("Master Price de NutriSana")
-st.markdown('<span style="font-size: 50%;">by GED</span>', unsafe_allow_html=True)
+st.title("Master Price de NutriSana " + '<span style="font-size: 50%; color: #888;">by GED</span>', unsafe_allow_html=True)
 st.subheader("Comparador de Precios")
 
 # 1. Carga de Datos al inicio (Automática)
@@ -222,7 +208,7 @@ st.sidebar.success(f"✅ {proveedores_cargados} de {len(PROVEEDORES_GSPREAD)} fu
 
 # 2. Interfaz de Búsqueda
 st.header("Búsqueda de Productos")
-st.markdown("Consejo: Usa '-' para excluir. Ejemplo: 'almendras -leche'. Usa '|' para búsqueda OR. Ejemplo: 'almendra | nuez'")
+st.markdown("Consejo: Usa `-` para excluir palabras (ej: `almendras -leche`). Usa `|` para búsqueda OR (ej: `almendra | nuez`). La búsqueda ignora acentos.")
 entrada_usuario = st.text_input("Ingrese el nombre del producto:", key="search_input")
 
 
@@ -238,20 +224,24 @@ if entrada_usuario and proveedores_cargados > 0:
         st.warning("😔 No se encontraron productos que coincidan con las palabras clave.")
     else:
         
+        # Itera sobre los resultados en el orden deseado
         for nombre_proveedor in [minorista_nombre] + orden_proveedores:
             if nombre_proveedor in resultados:
                 df_filtrado = resultados[nombre_proveedor].copy()
                 st.markdown(f"\n#### --- {nombre_proveedor.upper()} ---")
 
-                # Preparar DataFrame para Streamlit
+                # Preparar DataFrame para Streamlit: Aplicar formatos y reordenar
                 df_display = pd.DataFrame({
-                    # Usar la columna original para mostrar el texto con mayúsculas y acentos
-                    'Producto y Descripcion': df_filtrado['Producto y Descripcion Original'].str.title(), 
-                    # Aplicar formato condicional al precio
+                    # 1. Columna de Producto y Descripción (Limpieza y Capitalización)
+                    'Producto y Descripcion': df_filtrado['Producto y Descripcion'].str.title(), 
+                    
+                    # 2. Columna de Precio (Lógica condicional)
                     'Precio': df_filtrado['Precio'].apply(lambda p: format_precio(p, nombre_proveedor)),
-                    # Aplicar formato condicional a la variación
+                    
+                    # 3. Columna de Variación (Con colores en HTML)
                     'Var. Sem.': df_filtrado['% Variacion'].apply(format_variacion),
                 })
                 
-                # Mostrar tabla con formato
-                st.dataframe(df_display, use_container_width=True, hide_index=True)
+                # Concatenar las columnas de texto (Producto y Precio) y la columna HTML (Var. Sem.)
+                # Usamos st.markdown con to_html para renderizar los colores de la Var. Sem.
+                st.write(df_display.style.to_html(index=False, escape=False), unsafe_allow_html=True)
