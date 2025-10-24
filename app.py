@@ -18,7 +18,7 @@ PROVEEDORES_GSPREAD = {
     "Adrian": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCK0Q1WP5bQ0P9_Xazw3TYYpgs0LOLT2A7ZDeMGrV8aZ0bUJQkjBT9hYQu8UryQcJN6SgBFQgxyPuR/pub?output=csv",
     "Naturista": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSSnB4VhOGvIBgNusRrQRlvorvJ0YkBtnkj5rrRhyDfERIzSD8Ewx8K96PgMlOjDqXzGd4ZqL3bvu7s/pub?output=csv",
     "Sta Ana": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRRfZimr5ZlRootml7K1YRC8P-UvkB4FGnHnsnOt0R_0WiVkEwsBSlh5Dk6RvVd6WVQbVz7k-cqBcwG/pub?output=csv",
-    "Granja": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSNLPa4CWzGrjoL2XEzoBYrkepJSJ7RzOzb5XqP2hXyg1RPoddUTHbdkfPQphGZ5K1XmRo1WQK0br4S/pub?output=csv",
+    "Granja": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSNLPa4CWzGrjoL2XEzoBYrkepJSJ7RzOzb5XqP2hXyg1RPodDUTHbdkfPQphGZ5K1XmRo1WQK0br4S/pub?output=csv",
 }
 
 # Generar la lista de proveedores (excluyendo NutriSana para el orden de la tabla)
@@ -240,3 +240,4 @@ if entrada_usuario and proveedores_cargados > 0:
                 
                 # Usamos st.write con to_html para renderizar los colores de la Var. Sem. y ELIMINAR EL ÍNDICE (index=False)
                 st.write(df_display.style.to_html(index=False, escape=False), unsafe_allow_html=True)
+
