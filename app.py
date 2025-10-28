@@ -218,3 +218,4 @@ if entrada_usuario and proveedores_cargados > 0:
 
                 # Mostrar tabla: Oculta el índice y usa st.markdown para renderizar el HTML con los colores
                 st.write(df_display.style.hide(axis="index").to_html(escape=False), unsafe_allow_html=True)
+
